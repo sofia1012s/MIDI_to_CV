@@ -16,6 +16,13 @@ bool isMonophonic = false; // Variable to track the current configuration
 
 bool previousSwitchState = HIGH; // Variable to track the previous state of the switch
 
+unsigned long lastDebounceTime = 0;
+unsigned long debounceDelay = 50;
+int lastSwitchState = HIGH;
+int switchState = HIGH;
+
+byte notes[3] = {127, 127, 127}; // Array to store the notes for polyphonic mode
+
 void setup() {
   Serial.begin(115200);
   delay(1500);
@@ -41,11 +48,6 @@ void setup() {
 
   pinMode(switchPin, INPUT_PULLUP); // Set the switch pin as input with pull-up
 }
-
-unsigned long lastDebounceTime = 0;
-unsigned long debounceDelay = 50;
-int lastSwitchState = HIGH;
-int switchState = HIGH;
 
 void loop() {
   myusb.Task();
@@ -74,43 +76,112 @@ void loop() {
   lastSwitchState = switchReading;
 }
 
-
-
-// ... (Rest of your code remains the same)
-
 void myNoteOn(byte channel, byte note, byte velocity) {
-  float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
+  if (isMonophonic) {
+    float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
+    Serial.print("Note On, ch=");
+    Serial.print(channel, DEC);
+    Serial.print(", note=");
+    Serial.print(note, DEC);
+    Serial.print(", velocity=");
+    Serial.print(velocity, DEC);
+    Serial.print(", voltage=");
+    Serial.println(voltage, 3);
+    
+    uint16_t dacValue = voltage * 4095 / voltaje_ref; 
+    mcp.setChannelValue(MCP4728_CHANNEL_A, dacValue);
+    mcp.setChannelValue(MCP4728_CHANNEL_B, dacValue);
+    mcp.setChannelValue(MCP4728_CHANNEL_C, dacValue);
 
-  Serial.print("Note On, ch=");
-  Serial.print(channel, DEC);
-  Serial.print(", note=");
-  Serial.print(note, DEC);
-  Serial.print(", velocity=");
-  Serial.print(velocity, DEC);
-  Serial.print(", voltage=");
-  Serial.println(voltage, 3);
+  } 
   
-  uint16_t dacValue = voltage * 4095 / voltaje_ref; 
-  mcp.setChannelValue(MCP4728_CHANNEL_A, dacValue);
-
+  else {
+    float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
+    Serial.print("Note On, ch=");
+    Serial.print(channel, DEC);
+    Serial.print(", note=");
+    Serial.print(note, DEC);
+    Serial.print(", velocity=");
+    Serial.print(velocity, DEC);
+    Serial.print(", voltage=");
+    Serial.println(voltage, 3);
+    // Polyphonic mode logic
+    for (int i = 0; i < 3; i++) {
+      if (notes[i] == 127) {
+        notes[i] = note;
+        updateOutputs();
+        break;
+      }
+    }
+  }
 }
 
 void myNoteOff(byte channel, byte note, byte velocity) {
-  float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
+  if (isMonophonic) {
+    float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
+    Serial.print("Note Off, ch=");
+    Serial.print(channel, DEC);
+    Serial.print(", note=");
+    Serial.print(note, DEC);
+    Serial.print(", velocity=");
+    Serial.print(velocity, DEC);
+    Serial.print(", voltage=");
+    Serial.println(voltage, 3);
 
-  Serial.print("Note Off, ch=");
-  Serial.print(channel, DEC);
-  Serial.print(", note=");
-  Serial.print(note, DEC);
-  Serial.print(", velocity=");
-  Serial.print(velocity, DEC);
-  Serial.print(", voltage=");
-  Serial.println(voltage, 3);
+    uint16_t dacValue = voltage * 4095 / voltaje_ref;
+    mcp.setChannelValue(MCP4728_CHANNEL_A, dacValue);
+    mcp.setChannelValue(MCP4728_CHANNEL_B, dacValue);
+    mcp.setChannelValue(MCP4728_CHANNEL_C, dacValue);
+  }
 
-  uint16_t dacValue = voltage * 4095 / voltaje_ref;
-  mcp.setChannelValue(MCP4728_CHANNEL_A, dacValue);
-  mcp.setChannelValue(MCP4728_CHANNEL_B, dacValue);
-  mcp.setChannelValue(MCP4728_CHANNEL_C, dacValue);
+  else{
+      for (int i = 0; i < 3; i++) {
+        float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
+        Serial.print("Note Off, ch=");
+        Serial.print(channel, DEC);
+        Serial.print(", note=");
+        Serial.print(note, DEC);
+        Serial.print(", velocity=");
+        Serial.print(velocity, DEC);
+        Serial.print(", voltage=");
+        Serial.println(voltage, 3);
+
+      if (notes[i] == note) {
+        notes[i] = 127;
+        updateOutputs();
+        break;
+      }
+    }
+  }
+}
+
+void updateOutputs() {
+  for (int i = 0; i < 3; i++) {
+    if (i == 0){
+      if (notes[i] != 127) {
+      float voltage = (notes[i] - 24) / 12.0 * VOLT_PER_OCTAVE;
+      uint16_t dacValue = voltage * 4095 / voltaje_ref;
+      mcp.setChannelValue(MCP4728_CHANNEL_A, dacValue); // Output the note to the corresponding channel
+      }
+    }
+
+    if (i == 1){
+      if (notes[i] != 127) {
+      float voltage = (notes[i] - 24) / 12.0 * VOLT_PER_OCTAVE;
+      uint16_t dacValue = voltage * 4095 / voltaje_ref;
+      mcp.setChannelValue(MCP4728_CHANNEL_B, dacValue); // Output the note to the corresponding channel
+      }
+
+    }
+
+    if (i == 2){
+      if (notes[i] != 127) {
+      float voltage = (notes[i] - 24) / 12.0 * VOLT_PER_OCTAVE;
+      uint16_t dacValue = voltage * 4095 / voltaje_ref;
+      mcp.setChannelValue(MCP4728_CHANNEL_C, dacValue); // Output the note to the corresponding channel
+      }
+    }
+  }
 }
 
 void myControlChange(byte channel, byte control, byte value) {
@@ -128,4 +199,3 @@ void myControlChange(byte channel, byte control, byte value) {
   uint16_t dacValue = voltage * 4095 / voltaje_ref;
   mcp.setChannelValue(MCP4728_CHANNEL_D, dacValue);
 }
-
