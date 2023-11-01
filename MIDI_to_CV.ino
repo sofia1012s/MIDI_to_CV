@@ -10,6 +10,11 @@ Adafruit_MCP4728 mcp;
 
 const float VOLT_PER_OCTAVE = 1.0; // 1V/octave standard
 const float voltaje_ref = 5.0;
+const int switchPin = 2; // Digital pin connected to the SPDT switch
+
+bool isMonophonic = false; // Variable to track the current configuration
+
+bool previousSwitchState = HIGH; // Variable to track the previous state of the switch
 
 void setup() {
   Serial.begin(115200);
@@ -30,16 +35,48 @@ void setup() {
       delay(10);
     }
   }
-
   else{
     Serial.println("MCP4728 encontrado");
   }
+
+  pinMode(switchPin, INPUT_PULLUP); // Set the switch pin as input with pull-up
 }
+
+unsigned long lastDebounceTime = 0;
+unsigned long debounceDelay = 50;
+int lastSwitchState = HIGH;
+int switchState = HIGH;
 
 void loop() {
   myusb.Task();
   midi1.read();
+
+  int switchReading = digitalRead(switchPin);
+
+  if (switchReading != lastSwitchState) {
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (switchReading != switchState) {
+      switchState = switchReading;
+
+      if (switchState == LOW) {
+        isMonophonic = true;
+        Serial.println("Switched to Monophonic Mode");
+      } else {
+        isMonophonic = false;
+        Serial.println("Switched to Polyphonic Mode");
+      }
+    }
+  }
+
+  lastSwitchState = switchReading;
 }
+
+
+
+// ... (Rest of your code remains the same)
 
 void myNoteOn(byte channel, byte note, byte velocity) {
   float voltage = (note - 24) / 12.0 * VOLT_PER_OCTAVE; // Shift down by one octave
@@ -91,3 +128,4 @@ void myControlChange(byte channel, byte control, byte value) {
   uint16_t dacValue = voltage * 4095 / voltaje_ref;
   mcp.setChannelValue(MCP4728_CHANNEL_D, dacValue);
 }
+
