@@ -47,6 +47,7 @@ void setup() {
   }
 
   pinMode(switchPin, INPUT_PULLUP); // Set the switch pin as input with pull-up
+  digitalWrite(41, HIGH);
 }
 
 void loop() {
@@ -93,6 +94,9 @@ void myNoteOn(byte channel, byte note, byte velocity) {
     mcp.setChannelValue(MCP4728_CHANNEL_B, dacValue);
     mcp.setChannelValue(MCP4728_CHANNEL_C, dacValue);
 
+    //Gate 
+    digitalWrite(41, LOW);
+
   } 
   
   else {
@@ -132,6 +136,8 @@ void myNoteOff(byte channel, byte note, byte velocity) {
     mcp.setChannelValue(MCP4728_CHANNEL_A, dacValue);
     mcp.setChannelValue(MCP4728_CHANNEL_B, dacValue);
     mcp.setChannelValue(MCP4728_CHANNEL_C, dacValue);
+
+    digitalWrite(41, HIGH);
   }
 
   else{
